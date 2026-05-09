@@ -76,7 +76,7 @@ end})
 TabMove:CreateSlider({Name = "Vitesse", Range = {16, 200}, Increment = 1, CurrentValue = 16, Callback = function(v) getgenv().Config.WalkSpeed = v end})
 TabMove:CreateToggle({Name = "Saut Infini", CurrentValue = false, Callback = function(v) getgenv().Config.InfiniteJump = v end})
 TabMove:CreateToggle({Name = "Noclip", CurrentValue = false, Callback = function(v) getgenv().Config.Noclip = v end})
-TabMove:CreateToggle({Name = "Fly", CurrentValue = false, Callback = function(v) getgenv().Config.FlyEnabled = v end})
+TabMove:CreateToggle({Name = "Fly (Voler)", CurrentValue = false, Flag = "FlyT", Callback = function(v) getgenv().Config.Fly = v end})
 
 -- --- FONCTIONS ---
 local function GetClosest()
@@ -177,5 +177,16 @@ Players.PlayerAdded:Connect(function(p)
         end)
     end)
 end)
+-- Système de Vol (Fly)
+    if getgenv().Config.Fly and char:FindFirstChild("HumanoidRootPart") then
+        local hrp = char.HumanoidRootPart
+        local dir = Vector3.new(0,0,0)
+        if UIS:IsKeyDown(Enum.KeyCode.Z) then dir = dir + Camera.CFrame.LookVector end
+        if UIS:IsKeyDown(Enum.KeyCode.S) then dir = dir - Camera.CFrame.LookVector end
+        if UIS:IsKeyDown(Enum.KeyCode.D) then dir = dir + Camera.CFrame.RightVector end
+        if UIS:IsKeyDown(Enum.KeyCode.Q) then dir = dir - Camera.CFrame.RightVector end
+        hrp.Velocity = dir * getgenv().Config.FlySpd
+        hrp.Anchored = (dir == Vector3.new(0,0,0))
+    elseif char:FindFirstChild("HumanoidRootPart") then char.HumanoidRootPart.Anchored = false end
 
 Rayfield:Notify({Title = "Gemini V12", Content = "Instances précédentes nettoyées. Menu prêt."})
