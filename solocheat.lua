@@ -5,12 +5,39 @@ for _, gui in pairs(game:GetService("CoreGui"):GetChildren()) do
     end
 end
 
+-- --- SYSTÈME DE SAUVEGARDE JSON ---
+local ConfigFile = "SoloCheat_Config.json"
+
+local function SaveConfig()
+    local json = game:GetService("HttpService"):JSONEncode(getgenv().Config)
+    if writefile then
+        writefile(ConfigFile, json)
+    end
+end
+
+local function LoadConfig()
+    if readfile and readfile(ConfigFile) then
+        local success, data = pcall(function()
+            return game:GetService("HttpService"):JSONDecode(readfile(ConfigFile))
+        end)
+        if success and data then
+            for key, value in pairs(data) do
+                getgenv().Config[key] = value
+            end
+            return true
+        end
+    end
+    return false
+end
+
+local success, err = pcall(function()
+
 local Rayfield = loadstring(game:HttpGet('https://sirius.menu/rayfield'))()
 
 local Window = Rayfield:CreateWindow({
-   Name = "Rivals TOTAL Hub | Gemini V12",
-   LoadingTitle = "Nettoyage et Injection...",
-   LoadingSubtitle = "Xeno Stable - Zero Conflict Edition",
+   Name = "SoloCheat",
+   LoadingTitle = "SoloCheat",
+   LoadingSubtitle = "JOIN DISCORD !",
    ConfigurationSaving = { Enabled = true }
 })
 
@@ -31,8 +58,12 @@ getgenv().Config = {
     StretchFactor = 0.5,
     FlyEnabled = false,
     FlySpeed = 50,
-    Noclip = false
+    Noclip = false,
+    DarkTexturesEnabled = false,
 }
+
+-- Charger la config sauvegardée
+LoadConfig()
 
 local Camera = workspace.CurrentCamera
 local Players = game:GetService("Players")
@@ -63,11 +94,17 @@ TabCombat:CreateToggle({Name = "Afficher FOV", CurrentValue = false, Callback = 
 -- --- [TAB VISUELS] ---
 TabVisuals:CreateToggle({Name = "ESP Highlight (Stable)", CurrentValue = false, Callback = function(v) getgenv().Config.ESPEnabled = v end})
 TabVisuals:CreateToggle({Name = "Stretch Resolution", CurrentValue = false, Callback = function(v) getgenv().Config.StretchEnabled = v end})
-TabVisuals:CreateButton({Name = "Skin NEON Cyan (Arme)", Callback = function()
+    getgenv().Config.WeaponSkin = option
     local tool = LocalPlayer.Character and LocalPlayer.Character:FindFirstChildOfClass("Tool")
-    if tool then
-        for _, p in pairs(tool:GetDescendants()) do
-            if p:IsA("BasePart") then p.Material = Enum.Material.Neon p.Color = Color3.fromRGB(0, 255, 255) end
+    if tool then ApplyWeaponSkin(tool) end
+end})
+TabVisuals:CreateToggle({Name = "Dark Textures on Rivals", CurrentValue = false, Callback = function(v) 
+    getgenv().Config.DarkTexturesEnabled = v
+    if v then
+        for _, p in pairs(Players:GetPlayers()) do
+            if p ~= LocalPlayer and p.Character then
+                ApplyDarkTextures(p.Character)
+            end
         end
     end
 end})
@@ -76,7 +113,18 @@ end})
 TabMove:CreateSlider({Name = "Vitesse", Range = {16, 200}, Increment = 1, CurrentValue = 16, Callback = function(v) getgenv().Config.WalkSpeed = v end})
 TabMove:CreateToggle({Name = "Saut Infini", CurrentValue = false, Callback = function(v) getgenv().Config.InfiniteJump = v end})
 TabMove:CreateToggle({Name = "Noclip", CurrentValue = false, Callback = function(v) getgenv().Config.Noclip = v end})
-TabMove:CreateToggle({Name = "Fly (Voler)", CurrentValue = false, Flag = "FlyT", Callback = function(v) getgenv().Config.Fly = v end})
+TabMove:CreateToggle({Name = "Fly (Voler)", CurrentValue = false, Flag = "FlyT", Callback = function(v) getgenv().Config.FlyEnabled = v end})
+
+-- --- [TAB CONFIG] ---
+local TabConfig = Window:CreateTab("Config", 4483362458)
+TabConfig:CreateButton({Name = "Sauvegarder Config", Callback = function()
+    SaveConfig()
+    Rayfield:Notify({Title = "SoloCheat", Content = "Configuration sauvegardée!"})
+end})
+TabConfig:CreateButton({Name = "Charger Config", Callback = function()
+    LoadConfig()
+    Rayfield:Notify({Title = "SoloCheat", Content = "Configuration chargée!"})
+end})
 
 -- --- FONCTIONS ---
 local function GetClosest()
@@ -98,9 +146,27 @@ local function GetClosest()
 end
 
 local function PlayKillSound()
+    local KillSounds = {
+        "rbxassetid://160432331", -- Ding
+        "rbxassetid://142700651", -- Another ding
+        "rbxassetid://131961136", -- Gunshot
+        "rbxassetid://146830992", -- Explosion
+        "rbxassetid://138210320"  -- Bell
+    }
     local s = Instance.new("Sound", game:GetService("SoundService"))
-    s.SoundId = "rbxassetid://160432331" s.Volume = 5 s:Play()
+    s.SoundId = KillSounds[math.random(1, #KillSounds)]
+    s.Volume = 5
+    s:Play()
     game:GetService("Debris"):AddItem(s, 2)
+end
+
+local function ApplyDarkTextures(char)
+    for _, part in pairs(char:GetDescendants()) do
+        if part:IsA("BasePart") then
+            part.Material = Enum.Material.Plastic
+            part.Color = Color3.fromRGB(20, 20, 20)
+        end
+    end
 end
 
 -- --- BOUCLE PRINCIPALE ---
@@ -115,14 +181,28 @@ RunService.RenderStepped:Connect(function()
     if getgenv().Config.StretchEnabled then Camera.CFrame = Camera.CFrame * CFrame.new(0,0,0, 1,0,0, 0, getgenv().Config.StretchFactor, 0, 0,0,1) end
     if getgenv().Config.Noclip then for _, v in pairs(char:GetDescendants()) do if v:IsA("BasePart") then v.CanCollide = false end end end
 
+    -- Fly
+    if getgenv().Config.FlyEnabled and char:FindFirstChild("HumanoidRootPart") then
+        local hrp = char.HumanoidRootPart
+        local dir = Vector3.new(0,0,0)
+        if UIS:IsKeyDown(Enum.KeyCode.W) then dir = dir + Camera.CFrame.LookVector end
+        if UIS:IsKeyDown(Enum.KeyCode.S) then dir = dir - Camera.CFrame.LookVector end
+        if UIS:IsKeyDown(Enum.KeyCode.D) then dir = dir + Camera.CFrame.RightVector end
+        if UIS:IsKeyDown(Enum.KeyCode.A) then dir = dir - Camera.CFrame.RightVector end
+        if UIS:IsKeyDown(Enum.KeyCode.Space) then dir = dir + Vector3.new(0,1,0) end
+        if UIS:IsKeyDown(Enum.KeyCode.LeftShift) then dir = dir - Vector3.new(0,1,0) end
+        hrp.Velocity = dir * getgenv().Config.FlySpeed
+        hrp.Anchored = (dir == Vector3.new(0,0,0))
+    elseif char:FindFirstChild("HumanoidRootPart") then char.HumanoidRootPart.Anchored = false end
+
     -- ESP Highlight
     for _, p in pairs(Players:GetPlayers()) do
         if p ~= LocalPlayer and p.Character then
-            local hl = p.Character:FindFirstChild("GeminiESP")
+            local hl = p.Character:FindFirstChild("SoloCheatESP")
             if getgenv().Config.ESPEnabled then
                 if not hl then
                     hl = Instance.new("Highlight", p.Character)
-                    hl.Name = "GeminiESP"
+                    hl.Name = "SoloCheatESP"
                     hl.FillColor = Color3.fromRGB(255, 0, 0)
                 end
                 hl.Enabled = (p.Character:FindFirstChildOfClass("Humanoid").Health > 0)
@@ -175,18 +255,49 @@ Players.PlayerAdded:Connect(function(p)
         c:WaitForChild("Humanoid").Died:Connect(function()
             if getgenv().Config.KillSound then PlayKillSound() end
         end)
+        if getgenv().Config.DarkTexturesEnabled then
+            ApplyDarkTextures(c)
+        end
     end)
 end)
--- Système de Vol (Fly)
-    if getgenv().Config.Fly and char:FindFirstChild("HumanoidRootPart") then
-        local hrp = char.HumanoidRootPart
-        local dir = Vector3.new(0,0,0)
-        if UIS:IsKeyDown(Enum.KeyCode.Z) then dir = dir + Camera.CFrame.LookVector end
-        if UIS:IsKeyDown(Enum.KeyCode.S) then dir = dir - Camera.CFrame.LookVector end
-        if UIS:IsKeyDown(Enum.KeyCode.D) then dir = dir + Camera.CFrame.RightVector end
-        if UIS:IsKeyDown(Enum.KeyCode.Q) then dir = dir - Camera.CFrame.RightVector end
-        hrp.Velocity = dir * getgenv().Config.FlySpd
-        hrp.Anchored = (dir == Vector3.new(0,0,0))
-    elseif char:FindFirstChild("HumanoidRootPart") then char.HumanoidRootPart.Anchored = false end
 
-Rayfield:Notify({Title = "Gemini V12", Content = "Instances précédentes nettoyées. Menu prêt."})
+-- Apply dark textures to existing players
+for _, p in pairs(Players:GetPlayers()) do
+    if p.Character and getgenv().Config.DarkTexturesEnabled then
+        ApplyDarkTextures(p.Character)
+    end
+end
+
+-- Weapon Skin Application
+LocalPlayer.CharacterAdded:Connect(function(c)
+    local tool = c:FindFirstChildOfClass("Tool")
+    if tool then ApplyWeaponSkin(tool) end
+    c.ChildAdded:Connect(function(child)
+        if child:IsA("Tool") then ApplyWeaponSkin(child) end
+    end)
+end)
+
+local function HookTool(tool)
+    if not tool or not tool:IsA("Tool") then return end
+    ApplyWeaponSkin(tool)
+    tool.Equipped:Connect(function()
+        ApplyWeaponSkin(tool)
+    end)
+end
+
+-- Apply to current tool
+local currentTool = LocalPlayer.Character and LocalPlayer.Character:FindFirstChildOfClass("Tool")
+if currentTool then ApplyWeaponSkin(currentTool) end
+for _, tool in pairs(LocalPlayer.Backpack:GetChildren()) do
+    HookTool(tool)
+end
+LocalPlayer.Backpack.ChildAdded:Connect(HookTool)
+
+-- --- AUTO-SAVE SYSTEM ---
+task.spawn(function()
+    while task.wait(30) do
+        SaveConfig()
+    end
+end)
+
+Rayfield:Notify({Title = "SoloCheat V12", Content = "Instances précédentes nettoyées. Menu prêt."})
